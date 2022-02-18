@@ -9,10 +9,10 @@ class RTC {
         void init();
         DateTime getDateTime();
         bool isInActiveWindow(bool);
-        RTC_DS1307 rtc;
+        int daysFromU();
+        RTC_PCF8523 rtc;
     private:
       boolean dateTimeMatchEEPROMDateTime();
-      void writeDateTimeToEEPROM();
       void printDateTime(DateTime);
 
 };

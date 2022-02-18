@@ -12,8 +12,11 @@ void RTC::setup() {
   pinMode(DAYTIME_MODE_PIN, INPUT_PULLUP);
 }
 
+String uploadDateTime = String(__DATE__)+" "+String(__TIME__);
+
 void RTC::init() {
-  Serial.print("Running RTC init...  ");
+  Serial.println("Running RTC init...  ");
+  EEPROM.begin(512);
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     return; // STATUS_CODE_RTC_NOT_FOUND;
@@ -22,63 +25,35 @@ void RTC::init() {
     return; // STATUS_CODE_RTC_TIME_NOT_SET;
   }
   
-  if (dateTimeMatchEEPROMDateTime()) {
+  if (EEPROM.readString(0) == uploadDateTime) {
     // RTC already written to. Check that the RTC hasn't lost track.
-    printDateTime(DateTime(F(__DATE__), F(__TIME__)));
-    
     if (rtc.now().unixtime() < DateTime(F(__DATE__), F(__TIME__)).unixtime()) {
-      Serial.print("RTC has lost track of time. It thinks the time is ");
-      printDateTime(rtc.now());
-      Serial.print(" But the code was updated on");
-      printDateTime(DateTime(F(__DATE__), F(__TIME__)));
+      Serial.println("RTC has lost track of time. It thinks the time is "+rtc.now().timestamp());
+      Serial.println("But the code was updated on "+DateTime(F(__DATE__), F(__TIME__)).timestamp());
       blinkStatus(STATUS_CODE_RTC_TIME_NOT_SET, true);
       return;
     }
-    Serial.println("RTC set");
+    Serial.println("RTC set. Time is: "+rtc.now().timestamp());
     return;
   }
 
   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  writeDateTimeToEEPROM();
-  Serial.println("New time written to RTC");
+  Serial.print("Writing uploadDateTime to EEPROM: ");
+  Serial.println(uploadDateTime);
+  EEPROM.writeString(0, uploadDateTime);
+  EEPROM.commit();
+  Serial.println("New time written to RTC of "+rtc.now().timestamp());
 }
 
-// Check if the datetime has already been written to the RTC.
-boolean RTC::dateTimeMatchEEPROMDateTime() {
-  String datetime = String(__DATE__)+String(__TIME__);
-  for (int i = 0; i<datetime.length(); i++) {
-    if (EEPROM.read(i) != int(datetime[i])) {
-      Serial.println("Writing new time to RTC");
-      return false;
-    }
-  }
-  return true;
-}
-
-//Save date time that was writtent to EEPROM so next boot it won't write to the RTC again.
-void RTC::writeDateTimeToEEPROM() {
-  String datetime = String(__DATE__)+String(__TIME__);
-  for (int i = 0; i<datetime.length(); i++) {
-    EEPROM.write(i, int(datetime[i]));
-  }
-}
-
-DateTime RTC::getDateTime() {
-    return rtc.now();
-}
-
-void RTC::printDateTime(DateTime d) {
-  char buf1[20];
-  sprintf(buf1, "%02d-%02d-%02d %02d:%02d:%02d", d.year(), d.month(), d.day(), d.hour(), d.minute(), d.second()); 
-  Serial.print(F("Date/Time: "));
-  Serial.println(buf1);  
-}
+int RTC::daysFromU() {
+  return rtc.now().unixtime()/86400; 
+};
 
 bool RTC::isInActiveWindow(bool printMessages) {
   DateTime now = rtc.now();
   if (printMessages) {
-    Serial.print("current datetime is");
-    printDateTime(now);
+    Serial.print("current datetime is ");
+    Serial.println(now.timestamp());
   }
   if (digitalRead(DAYTIME_MODE_PIN) == LOW) {
     if (printMessages) {
