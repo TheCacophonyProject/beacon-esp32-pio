@@ -1,3 +1,4 @@
+/*
 #ifndef beacons_h
 #define beacons_h
 #include <BLEAdvertisedDevice.h>
@@ -10,3 +11,4 @@ class MyAdvertisedDeviceCallbacks : BLEAdvertisedDeviceCallbacks {
 
 
 #endif
+*/
