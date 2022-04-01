@@ -3,7 +3,6 @@
 
 #include <RTClib.h>
 
-void printMIn24(int);
 void blinkStatus(int, bool);
 
 #endif

@@ -3,14 +3,11 @@ Audio test.
 - Audio will be played about every 30 minutes.
 - Each night a different audio file will be chosen to be played for that night.
 - Times of audio being played will be logged to the SD card.
-- If an bluetooth beacon is detected in the 2 minutes before the audio is to be played it will be played at half volume.
+- If an bluetooth beacon is detected in the 1 minute before the audio is to be played it will be played at a quiter volume.
 */
 
-//TODO, top is highest priority.
+//TODO
 /*
-- Play audio at a quieter volume when there is a beacon.
-- Only react from camera with set ID.
-- Only play in the set time window.
 //===== Extra TODO =======================
 - Alert user by buzzer if something is wrong.
 - Logs errors and such to file.
@@ -20,6 +17,7 @@ Audio test.
 - Text to voice so can comunicate with users more easily.
 - Improve log/csv audio logs format.
 - Audio range from 0 to 100 not 0 to 21
+- Test active vs non-active scan power usage/reaction time/range.
 */
 
 
@@ -60,6 +58,7 @@ Audio test.
 #define LOG_DIR String("/logs")
 #define LOG_AUDIO LOG_DIR + "/audio.log"
 #define AUDIO_DIR "/audio"
+#define DEVICE_ID_FILE "/cameraDeviceID"
 
 
 Audio audio;
@@ -73,6 +72,9 @@ RTC rtc;
 
 int audioFileCount = 0;
 bool cacBeacon = false;
+#define DEVICE_ID_LEN 20
+int deviceIDs[DEVICE_ID_LEN];
+int deviceID = 0;
 
 int scanTime = 20; //In seconds
 BLEScan *pBLEScan;
@@ -86,38 +88,69 @@ void writeLog(String file, String log) {
   f.close();
 }
 
+void addDeviceID(int newID) {
+  for (int i = 0; i < DEVICE_ID_LEN; i++) {
+    int id = deviceIDs[i];
+    if (id == 0) {
+      Serial.println("Adding beacon device ID: " + String(newID));
+      deviceIDs[i] = newID;
+      return;
+    }
+    if (id == newID) {
+      return;
+    }
+  }
+  Serial.println("No more room to store devices IDs from beacons!");
+}
+
+bool checkForID(int id) {
+  for (int i = 0; i < DEVICE_ID_LEN; i++) {
+    if (id == deviceIDs[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice advertisedDevice) {
-    //Serial.println("Res");
     if (advertisedDevice.haveManufacturerData() == true) {
       std::string strManufacturerData = advertisedDevice.getManufacturerData();
       uint8_t cManufacturerData[100];
       strManufacturerData.copy((char *)cManufacturerData, strManufacturerData.length(), 0);
       if (strManufacturerData.length() >= 10 && strManufacturerData[0] == 0x12 && strManufacturerData[1] == 0x12) {
-        Serial.println("Found Cacophony beacon!");
+        //Serial.println("Found Cacophony beacon!");
         cacBeacon = true;
         for (int i = 0; i < strManufacturerData.length(); i++) {
-          Serial.printf("[%X]", cManufacturerData[i]);
+          //Serial.printf("[%X]", cManufacturerData[i]);
         }
-        Serial.printf("\n");
-        pBLEScan->stop();
-        Serial.println("Stopping scan.");
+        //Serial.printf("\n");
+        int id = (cManufacturerData[3]<<8) + cManufacturerData[4];
+        addDeviceID(id);
+        //pBLEScan->stop();
       }
     }
   }
 };
 
-void sleep(long seconds) {
-  Serial.print("Sleeping for ");
-  Serial.print(seconds);
-  Serial.println(" seconds");
-  digitalWrite(SD_ENABLE, LOW);
-  Serial.flush();
-  esp_sleep_enable_timer_wakeup(seconds * 1000L * 1000L);
-  esp_light_sleep_start();
-  Serial.println("waking up from sleep");
-  digitalWrite(SD_ENABLE, HIGH);
-};
+void initAudio() {
+  Serial.println("Init Audio");
+  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+  Serial.println("Audio files:");
+  File audioDir = SD.open(AUDIO_DIR);
+  audioFileCount = 0;
+  while (true) {
+    File audioFile = audioDir.openNextFile();
+    if (!audioFile) {
+      break;
+    }
+    if (!audioFile.isDirectory()) {
+      Serial.println(audioFile.name());
+      audioFileCount++;
+    }
+  }
+  Serial.println("Found " + String(audioFileCount) + " audio files.");
+}
 
 File whatSoundToPlay() {
   int daysAudioFileIndex = TimeSpan(rtc.rtc.now().unixtime()).days()%audioFileCount;
@@ -140,23 +173,6 @@ File whatSoundToPlay() {
   return audioFile;
 }
 
-void initAudioDir() {
-  Serial.println("Audio files:");
-  File audioDir = SD.open(AUDIO_DIR);
-  audioFileCount = 0;
-  while (true) {
-    File audioFile = audioDir.openNextFile();
-    if (!audioFile) {
-      break;
-    }
-    if (!audioFile.isDirectory()) {
-      Serial.println(audioFile.name());
-      audioFileCount++;
-    }
-  }
-  Serial.println("Found " + String(audioFileCount) + " audio files.");
-}
-
 void playSound(int volume) {
   String file = whatSoundToPlay().name();
   //String file = "/audio/3. S1.wav";
@@ -171,6 +187,9 @@ void playSound(int volume) {
   writeLog(LOG_AUDIO, "Finished playing: " + file);
 }
 
+/*
+  hibernate - Will go into low power mode. When waking up the program will start from the beginning.
+*/
 void hibernate(long seconds) {
   pinMode(SD_ENABLE, OUTPUT);
   digitalWrite(SD_ENABLE, HIGH);
@@ -178,19 +197,29 @@ void hibernate(long seconds) {
   esp_deep_sleep_start();
 }
 
-void setup() {
-  delay(100);
-  //======= init ======
-  Serial.begin(115200);
-  Serial.println("\n\n\n\n================================================");
-  //while (true){}
-  rtc.init();
+/*
+  sleep - Low power delay.
+*/
+void sleep(long seconds) {
+  Serial.print("Sleeping for ");
+  Serial.print(seconds);
+  Serial.println(" seconds");
+  digitalWrite(SD_ENABLE, HIGH);
+  Serial.flush();
+  esp_sleep_enable_timer_wakeup(seconds * 1000L * 1000L);
+  esp_light_sleep_start();
+  Serial.println("waking up from sleep");
+  digitalWrite(SD_ENABLE, HIGH);
+};
 
+/*
+
+*/
+void initSDCard() {
   Serial.println("Init SD card");
   pinMode(SD_ENABLE, OUTPUT);
   digitalWrite(SD_ENABLE, LOW);
   delay(100);
-  
   if (!SD.begin(SD_CS)) {
     Serial.println("Initialization of SD failed!");
     while (1);
@@ -211,24 +240,45 @@ void setup() {
     f.println("Datetime, file, volume (0 to 21)");
     f.close();
   }
-  Serial.println("Init Audio");
-  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-  initAudioDir();
+  if (SD.exists(DEVICE_ID_FILE)) {
+    File deviceIDFile = SD.open(DEVICE_ID_FILE, FILE_READ);
+    String deviceIDStr = deviceIDFile.readString();
+    deviceID = deviceIDStr.toInt();
+    Serial.println("Device ID to listen to: " + String(deviceID));
+  }
+}
+
+/*
+  beaconScan - Will scan for bluetooth beacons for scanTime seconds.
+*/
+void beaconScan(int scanTime) {
   BLEDevice::init("");
-  pBLEScan = BLEDevice::getScan(); //create new scan
+  pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
+  pBLEScan->setActiveScan(true);
   pBLEScan->setInterval(100);
   pBLEScan->setWindow(99); 
 
+  Serial.println("Scanning for beacons......");
   BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
-  Serial.print("Devices found: ");
-  Serial.println(foundDevices.getCount());
-  Serial.println("Scan done!");
-  pBLEScan->clearResults(); // delete results fromBLEScan buffer to release memory
+  pBLEScan->clearResults();
+}
+
+void setup() {
+  delay(200);
+  Serial.begin(115200);
+  Serial.println("\n\n================================================");
+  rtc.init();
+  initSDCard();
+  initAudio();
+
+  if (!rtc.isInActiveWindow(true)) {
+    hibernate(30);
+  }
+  beaconScan(scanTime);
 
   int vol = VOL_LOUD;
-  if (cacBeacon) {
+  if (checkForID(deviceID)) {
     Serial.println("Playing quiet sound..");
     vol = VOL_QUIET;
   }

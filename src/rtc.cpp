@@ -9,8 +9,20 @@
 Dusk2Dawn d2d_chch(LAT, LONG, 13);
 TwoWire tw = TwoWire(0);
 
-void RTC::setup() {
-  pinMode(DAYTIME_MODE_PIN, INPUT_PULLUP);
+void RTC::setup() {}
+
+void printMIn24(int m) {
+  int h = m/60;
+  m = m - 60*h;
+  if (h<10) {
+    Serial.print("0");
+  }
+  Serial.print(h);
+  Serial.print(":");
+  if (m<10) {
+    Serial.print("0");
+  }
+  Serial.println(m);
 }
 
 String uploadDateTime = DateTime(F(__DATE__), F(__TIME__)).timestamp();
@@ -64,19 +76,12 @@ int RTC::daysFromU() {
 bool RTC::isInActiveWindow(bool printMessages) {
   DateTime now = rtc.now();
   if (printMessages) {
-    Serial.print("current datetime is ");
-    Serial.println(now.timestamp());
-  }
-  if (digitalRead(DAYTIME_MODE_PIN) == LOW) {
-    if (printMessages) {
-      Serial.println("24/7 switch is on");
-    }
-    return true;
+    Serial.println("current datetime is " + now.timestamp());
   }
   
   int minutesFromMidnight = now.hour()*60 + now.minute();
-  int startMinute = d2d_chch.sunset(now.year(), now.month(), now.day(), false) + MINUTES_AFTER_SUNSET;
-  int stopMinute = d2d_chch.sunrise(now.year(), now.month(), now.day(), false) - MINUTES_BEFORE_SUNRISE;
+  int startMinute = d2d_chch.sunset(now.year(), now.month(), now.day(), false) - MINUTES_BEFORE_SUNSET;
+  int stopMinute = d2d_chch.sunrise(now.year(), now.month(), now.day(), false) + MINUTES_AFTER_SUNRISE;
   
   if (printMessages) {  
     Serial.print("Time of day: ");
@@ -111,3 +116,4 @@ bool RTC::isInActiveWindow(bool printMessages) {
     return false;
   }
 };
+
