@@ -122,27 +122,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
       if (strManufacturerData.length() >= 10 && strManufacturerData[0] == 0x12 && strManufacturerData[1] == 0x12) {
         //Serial.println("Found Cacophony beacon!");
         cacBeacon = true;
-        switch (cManufacturerData[2]) {
-          case BEACON_PING_TYPE: {
-            PingBeacon a(strManufacturerData);
-            break;
-          }
-          case BEACON_RECORDING_TYPE: {
-            RecordingBeacon b(strManufacturerData);
-            break;
-          }
-          case BEACON_CLASSIFICATION_TYPE: {
-            ClassificationBeacon b(strManufacturerData);
-            break;
-          }
-          case BEACON_POWER_OFF_TYPE: {
-            PowerOffBeacon b(strManufacturerData);
-            break;
-          }
-        }
-        for (int i = 0; i < strManufacturerData.length(); i++) {
-          Serial.printf("[%X]", cManufacturerData[i]);
-        }
         //Serial.printf("\n");
         int id = (cManufacturerData[3]<<8) + cManufacturerData[4];
         addDeviceID(id);
