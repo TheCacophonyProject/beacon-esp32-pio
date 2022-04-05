@@ -27,7 +27,8 @@ Audio test.
 #include <BLEDevice.h>
 #include "cacBeacons.h"
 
-#define TRIGGER_PIN 2
+#define LED_PIN 2
+#define TRIGGER_PIN 17
 bool triggered = false;
 BLEScan *pBLEScan;
 
@@ -106,16 +107,20 @@ void setup() {
   Serial.begin(115200);
   Serial.println("\n\n=================");
   pinMode(TRIGGER_PIN, OUTPUT);
-  digitalWrite(TRIGGER_PIN, LOW);
+  digitalWrite(TRIGGER_PIN, HIGH);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
   setCpuFrequencyMhz(80);
   beaconScan(2);
   while (triggered) {
-    digitalWrite(TRIGGER_PIN, HIGH);
+    digitalWrite(TRIGGER_PIN, LOW);
+    digitalWrite(LED_PIN, HIGH);
     delay(2000);
     triggered = false;
     beaconScan(10);
   }
-  digitalWrite(TRIGGER_PIN, LOW);
+  digitalWrite(TRIGGER_PIN, HIGH);
+  digitalWrite(LED_PIN, LOW);
   hibernate(3);
 }
 
