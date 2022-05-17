@@ -6,7 +6,7 @@
 #include <RTClib.h>     // https://github.com/adafruit/RTClib
 #include <Dusk2Dawn.h>  // https://github.com/dmkishi/Dusk2Dawn
 
-Dusk2Dawn d2d_chch(LAT, LONG, 13);
+Dusk2Dawn d2d_chch(LAT, LONG, 12);
 TwoWire tw = TwoWire(0);
 
 void RTC::setup() {}
@@ -67,6 +67,15 @@ void RTC::init() {
   EEPROM.writeString(0, uploadDateTime);
   EEPROM.commit();
   Serial.println("New time written to RTC of "+rtc.now().timestamp());
+}
+
+int RTC::nightOfTheWeek(){
+  DateTime now = rtc.now();
+  int d = now.dayOfTheWeek();
+  if (!now.isPM()) {
+    d--;
+  }
+  return d%7;
 }
 
 int RTC::daysFromU() {

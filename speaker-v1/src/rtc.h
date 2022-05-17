@@ -8,6 +8,7 @@ class RTC {
     public:
         void setup();
         void init();
+        int nightOfTheWeek();
         DateTime getDateTime();
         bool isInActiveWindow(bool);
         int daysFromU();

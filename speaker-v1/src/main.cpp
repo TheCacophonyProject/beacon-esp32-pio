@@ -41,6 +41,7 @@ Audio test.
 #include <BLEEddystoneURL.h>
 #include <BLEEddystoneTLM.h>
 #include <BLEBeacon.h>
+#include <EEPROM.h>
 
 
 // Digital I/O used
@@ -58,9 +59,12 @@ Audio test.
 
 #define LOG_DIR String("/logs")
 #define LOG_AUDIO LOG_DIR + "/audio.log"
-#define AUDIO_DIR "/audio"
+#define AUDIO_DIR String("/audio")
 #define DEVICE_ID_FILE "/cameraDeviceID"
 
+bool triggered = false;
+
+String daysOfTheWeek[7] = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"};
 
 Audio audio;
 RTC rtc;
@@ -77,7 +81,8 @@ bool cacBeacon = false;
 int deviceIDs[DEVICE_ID_LEN];
 int deviceID = 0;
 
-int scanTime = 30; //In seconds
+//int scanTime = 30; //In seconds
+int scanTime = 1; //In seconds
 BLEScan *pBLEScan;
 File myFile;
 
@@ -120,6 +125,37 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
       uint8_t cManufacturerData[100];
       strManufacturerData.copy((char *)cManufacturerData, strManufacturerData.length(), 0);
       if (strManufacturerData.length() >= 10 && strManufacturerData[0] == 0x12 && strManufacturerData[1] == 0x12) {
+        for (int i = 0; i < strManufacturerData.length(); i++) {
+          //Serial.printf("[%X]", cManufacturerData[i]);
+        }
+        if (strManufacturerData[5] == BEACON_CLASSIFICATION_TYPE) {
+          ClassificationBeacon cBeacon = ClassificationBeacon(strManufacturerData);
+          Serial.println(cBeacon.deviceID);
+          Serial.println(cBeacon.animal[0]);
+          int animal = cBeacon.animal[0];
+          Serial.println(cBeacon.confidences[0]);
+          int con = cBeacon.confidences[0];
+          if (animal == 1 || animal == 7) {
+            if (con > 80) {
+              Serial.println("Trigger!!");
+              triggered = true;
+              pBLEScan->stop();
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+/*
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+  void onResult(BLEAdvertisedDevice advertisedDevice) {
+    if (advertisedDevice.haveManufacturerData() == true) {
+      std::string strManufacturerData = advertisedDevice.getManufacturerData();
+      uint8_t cManufacturerData[100];
+      strManufacturerData.copy((char *)cManufacturerData, strManufacturerData.length(), 0);
+      if (strManufacturerData.length() >= 10 && strManufacturerData[0] == 0x12 && strManufacturerData[1] == 0x12) {
         //Serial.println("Found Cacophony beacon!");
         cacBeacon = true;
         //Serial.printf("\n");
@@ -130,10 +166,24 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
     }
   }
 };
+*/
+
+int countFilesInDir(String dirStr) {
+  File dir = SD.open(dirStr);
+  int count = 0;
+  while (true) {
+    File f = dir.openNextFile();
+    if (!f) {
+      return count;
+    }
+    count++;
+  }
+}
 
 void initAudio() {
   Serial.println("Init Audio");
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+  /*
   Serial.println("Audio files:");
   File audioDir = SD.open(AUDIO_DIR);
   audioFileCount = 0;
@@ -148,6 +198,46 @@ void initAudio() {
     }
   }
   Serial.println("Found " + String(audioFileCount) + " audio files.");
+  */
+}
+
+int getSoundIndex() {
+  EEPROM.begin(512);
+  if (EEPROM.read(100) != rtc.nightOfTheWeek()){
+    //First sound for this night called
+    Serial.println("new night");
+    EEPROM.write(100, rtc.nightOfTheWeek());
+    EEPROM.write(101, 0);
+    EEPROM.commit();  
+    return 0;
+  }
+  int index = EEPROM.read(101);
+  index++;
+  EEPROM.write(101, index);
+  EEPROM.commit();
+  return index;
+}
+
+File whatFileToPlay(){
+  String dir = AUDIO_DIR+"/"+daysOfTheWeek[rtc.nightOfTheWeek()];
+  Serial.println(dir);
+  int filesForTonight = countFilesInDir(dir);
+  File audioDir = SD.open(dir);
+  File audioFile = audioDir.openNextFile();
+  int daysAudioFileIndex = getSoundIndex()%filesForTonight;
+  Serial.println(daysAudioFileIndex);
+  for (int i = 0; i < daysAudioFileIndex; i++) {
+    audioFile = audioDir.openNextFile();
+    if (!audioFile) {
+      break;
+    }
+  }
+  Serial.println("Audio file to play is" + String(audioFile.name()));
+  return audioFile;
+}
+
+bool noSoundToPlayTonight() {
+  return countFilesInDir(AUDIO_DIR+"/"+daysOfTheWeek[rtc.nightOfTheWeek()]) == 0;
 }
 
 File whatSoundToPlay() {
@@ -172,9 +262,10 @@ File whatSoundToPlay() {
 }
 
 void playSound(int volume) {
-  String file = whatSoundToPlay().name();
+  //String file = whatSoundToPlay().name();
+  String file = whatFileToPlay().name();
   //String file = "/audio/3. S1.wav";
-  writeLog(LOG_AUDIO, file + ", " + String(volume));
+  writeLog(LOG_AUDIO, "PLaying: " + file + ", " + String(volume));
   audio.setVolume(volume);
   char buf[file.length()+1];
   file.toCharArray(buf, file.length()+1);
@@ -200,6 +291,8 @@ void hibernate(long seconds) {
   sleep - Low power delay.
 */
 void sleep(long seconds) {
+  SD.end();
+  delay(100);
   Serial.print("Sleeping for ");
   Serial.print(seconds);
   Serial.println(" seconds");
@@ -208,7 +301,7 @@ void sleep(long seconds) {
   esp_sleep_enable_timer_wakeup(seconds * 1000L * 1000L);
   esp_light_sleep_start();
   Serial.println("waking up from sleep");
-  digitalWrite(SD_ENABLE, HIGH);
+  digitalWrite(SD_ENABLE, LOW);
 };
 
 /*
@@ -221,7 +314,7 @@ void initSDCard() {
   delay(100);
   if (!SD.begin(SD_CS)) {
     Serial.println("Initialization of SD failed!");
-    while (1);
+    hibernate(5L);
   }
   Serial.println("Checking LOG_DIR exists.");
   if (!SD.exists(LOG_DIR)) {
@@ -264,25 +357,57 @@ void beaconScan(int scanTime) {
 }
 
 void setup() {
-  delay(200);
+  //setCpuFrequencyMhz(80);
   Serial.begin(115200);
   Serial.println("\n\n================================================");
   rtc.init();
-  initSDCard();
+  //initSDCard();
   initAudio();
-
+  
+  /*
   if (!rtc.isInActiveWindow(true)) {
-    hibernate(60L*30L);
+    hibernate(60L*5L);
   }
-  beaconScan(scanTime);
+  if (noSoundToPlayTonight()) {
+    hibernate(60L*5L);
+  }
 
-  int vol = VOL_LOUD;
-  if (checkForID(deviceID)) {
-    Serial.println("Playing quiet sound..");
-    vol = VOL_QUIET;
+  beaconScan(scanTime);
+  if (triggered) {
+    playSound(VOL_LOUD);
+  } else {
+    Serial.println("no trigger");
   }
-  playSound(vol);
-  hibernate(60L*30L);
+  //playSound(VOL_LOUD);
+  hibernate(3);
+  */
+
+
+  //int vol = VOL_LOUD;
+  //if (checkForID(deviceID)) {
+  //  Serial.println("Playing quiet sound..");
+  //  vol = VOL_QUIET;
+  //}
+  //playSound(vol);
+  //hibernate(60L*30L);
 }
 
-void loop(){}
+void loop(){
+  initSDCard();
+  if (!rtc.isInActiveWindow(true)) {
+    hibernate(60L*5L);
+  }
+  if (noSoundToPlayTonight()) {
+    hibernate(60L*5L);
+  }
+
+  beaconScan(scanTime);
+  if (triggered) {
+    playSound(VOL_LOUD);
+    hibernate(10);
+  } else {
+    Serial.println("no trigger");
+  }
+
+  sleep(3L);
+}
