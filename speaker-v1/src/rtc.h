@@ -9,16 +9,14 @@ class RTC {
         void setup();
         void init();
         int nightOfTheWeek();
-        DateTime getDateTime();
+        DateTime now();
         bool isInActiveWindow(bool);
         int daysFromU();
         //RTC_PCF8523 rtc;
         RTC_PCF8563 rtc;
-        //TwoWire tw;
     private:
       boolean dateTimeMatchEEPROMDateTime();
       void printDateTime(DateTime);
-      //TwoWire tw;
 };
 
 #endif

@@ -9,6 +9,9 @@ Audio test.
 //TODO
 /*
 //===== Extra TODO =======================
+- Add timezone to date  // Need to test
+- 
+
 - Alert user by buzzer if something is wrong.
 - Logs errors and such to file.
 - Handle the case of not knowing the time.
@@ -87,7 +90,7 @@ BLEScan *pBLEScan;
 File myFile;
 
 void writeLog(String file, String log) {
-  log = rtc.rtc.now().timestamp() + ", " + log;
+  log = rtc.now().timestamp() + ", " + log;
   Serial.println(file + ": " + log);
   File f = SD.open(file, FILE_APPEND);
   f.println(log);
@@ -241,8 +244,8 @@ bool noSoundToPlayTonight() {
 }
 
 File whatSoundToPlay() {
-  int daysAudioFileIndex = TimeSpan(rtc.rtc.now().unixtime()).days()%audioFileCount;
-  if (rtc.rtc.now().isPM()) {
+  int daysAudioFileIndex = TimeSpan(rtc.now().unixtime()).days()%audioFileCount;
+  if (rtc.now().isPM()) {
     daysAudioFileIndex = (daysAudioFileIndex+1)%audioFileCount;
   };
   Serial.println("Audio file index for today is: "+ String(daysAudioFileIndex));
