@@ -10,6 +10,7 @@ class RTC {
         void init();
         int nightOfTheWeek();
         DateTime now();
+        String timezoneStr();
         bool isInActiveWindow(bool);
         int daysFromU();
         //RTC_PCF8523 rtc;

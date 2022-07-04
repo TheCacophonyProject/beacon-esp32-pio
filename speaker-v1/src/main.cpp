@@ -9,17 +9,12 @@ Audio test.
 //TODO
 /*
 //===== Extra TODO =======================
-- Add timezone to date  // Need to test
-- 
-
 - Alert user by buzzer if something is wrong.
 - Logs errors and such to file.
 - Handle the case of not knowing the time.
 - Don't log dir in audio file logs.
 - Configure how often the audio will play.
-- Text to voice so can comunicate with users more easily.
 - Improve log/csv audio logs format.
-- Audio range from 0 to 100 not 0 to 21
 - Test active vs non-active scan power usage/reaction time/range.
 */
 
@@ -56,6 +51,7 @@ Audio test.
 #define I2S_DOUT      12
 #define I2S_BCLK      14
 #define I2S_LRC       25
+#define BUZZER_PIN 16
 
 #define START_MINUTE 0
 #define START_HOUR 12
@@ -151,26 +147,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   }
 };
 
-/*
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
-  void onResult(BLEAdvertisedDevice advertisedDevice) {
-    if (advertisedDevice.haveManufacturerData() == true) {
-      std::string strManufacturerData = advertisedDevice.getManufacturerData();
-      uint8_t cManufacturerData[100];
-      strManufacturerData.copy((char *)cManufacturerData, strManufacturerData.length(), 0);
-      if (strManufacturerData.length() >= 10 && strManufacturerData[0] == 0x12 && strManufacturerData[1] == 0x12) {
-        //Serial.println("Found Cacophony beacon!");
-        cacBeacon = true;
-        //Serial.printf("\n");
-        int id = (cManufacturerData[3]<<8) + cManufacturerData[4];
-        addDeviceID(id);
-        //pBLEScan->stop();
-      }
-    }
-  }
-};
-*/
-
 int countFilesInDir(String dirStr) {
   File dir = SD.open(dirStr);
   int count = 0;
@@ -186,22 +162,6 @@ int countFilesInDir(String dirStr) {
 void initAudio() {
   Serial.println("Init Audio");
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-  /*
-  Serial.println("Audio files:");
-  File audioDir = SD.open(AUDIO_DIR);
-  audioFileCount = 0;
-  while (true) {
-    File audioFile = audioDir.openNextFile();
-    if (!audioFile) {
-      break;
-    }
-    if (!audioFile.isDirectory()) {
-      Serial.println(audioFile.name());
-      audioFileCount++;
-    }
-  }
-  Serial.println("Found " + String(audioFileCount) + " audio files.");
-  */
 }
 
 int getSoundIndex() {
@@ -265,10 +225,8 @@ File whatSoundToPlay() {
 }
 
 void playSound(int volume) {
-  //String file = whatSoundToPlay().name();
   String file = whatFileToPlay().name();
-  //String file = "/audio/3. S1.wav";
-  writeLog(LOG_AUDIO, "PLaying: " + file + ", " + String(volume));
+  writeLog(LOG_AUDIO, "Playing: " + file + ", " + String(volume));
   audio.setVolume(volume);
   char buf[file.length()+1];
   file.toCharArray(buf, file.length()+1);
@@ -307,9 +265,6 @@ void sleep(long seconds) {
   digitalWrite(SD_ENABLE, LOW);
 };
 
-/*
-
-*/
 void initSDCard() {
   Serial.println("Init SD card");
   pinMode(SD_ENABLE, OUTPUT);
@@ -359,44 +314,35 @@ void beaconScan(int scanTime) {
   pBLEScan->clearResults();
 }
 
+esp_sleep_wakeup_cause_t wakeupReason;
+
 void setup() {
-  //setCpuFrequencyMhz(80);
+  wakeupReason = esp_sleep_get_wakeup_cause();
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
   Serial.begin(115200);
   Serial.println("\n\n================================================");
   rtc.init();
-  //initSDCard();
   initAudio();
-  
-  /*
-  if (!rtc.isInActiveWindow(true)) {
-    hibernate(60L*5L);
-  }
-  if (noSoundToPlayTonight()) {
-    hibernate(60L*5L);
-  }
-
-  beaconScan(scanTime);
-  if (triggered) {
-    playSound(VOL_LOUD);
-  } else {
-    Serial.println("no trigger");
-  }
-  //playSound(VOL_LOUD);
-  hibernate(3);
-  */
-
-
-  //int vol = VOL_LOUD;
-  //if (checkForID(deviceID)) {
-  //  Serial.println("Playing quiet sound..");
-  //  vol = VOL_QUIET;
-  //}
-  //playSound(vol);
-  //hibernate(60L*30L);
 }
 
 void loop(){
   initSDCard();
+
+  if (wakeupReason == ESP_SLEEP_WAKEUP_UNDEFINED) {
+    Serial.println("Device reset, listen for beacons for testing.");
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(1000);
+    digitalWrite(BUZZER_PIN, LOW);
+      beaconScan(20); 
+      while (triggered) {
+        playSound(VOL_LOUD);
+        triggered = false;
+        beaconScan(20);
+      }
+    hibernate(1);
+  }
+
   if (!rtc.isInActiveWindow(true)) {
     hibernate(60L*5L);
   }

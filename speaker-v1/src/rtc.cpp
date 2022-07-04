@@ -48,8 +48,10 @@ void RTC::init() {
     return; // TODO STATUS_CODE_INVALID_RTC_TIME
   }
 
-  Serial.println(DateTime(NZTZ.toLocal(rtc.now().unixtime(), &tcr)).timestamp());
-  Serial.println("RTC time (UTC) "+rtc.now().timestamp());
+  Serial.println("RTC local time: "+now().timestamp());
+  Serial.print("Daylight savings time: ");
+  Serial.println(NZTZ.locIsDST(now().unixtime()));
+  Serial.println("RTC time (UTC): "+rtc.now().timestamp());
 }
 
 int RTC::nightOfTheWeek(){
@@ -66,7 +68,7 @@ DateTime RTC::now(){
 }
 
 int RTC::daysFromU() {
-  return TimeSpan(rtc.now().unixtime()).days();
+  return TimeSpan(now().unixtime()).days();
 }
 
 void printMIn24(int m) {
@@ -84,14 +86,14 @@ void printMIn24(int m) {
 }
 
 bool RTC::isInActiveWindow(bool printMessages) {
-  DateTime now = rtc.now();
+  DateTime n = now();
   if (printMessages) {
-    Serial.println("current datetime is " + now.timestamp());
+    Serial.println("current datetime is " + n.timestamp());
   }
   
-  int minutesFromMidnight = now.hour()*60 + now.minute();
-  int startMinute = d2d_chch.sunset(now.year(), now.month(), now.day(), false) - MINUTES_BEFORE_SUNSET;
-  int stopMinute = d2d_chch.sunrise(now.year(), now.month(), now.day(), false) + MINUTES_AFTER_SUNRISE;
+  int minutesFromMidnight = n.hour()*60 + n.minute();
+  int startMinute = d2d_chch.sunset(n.year(), n.month(), n.day(), false) - MINUTES_BEFORE_SUNSET;
+  int stopMinute = d2d_chch.sunrise(n.year(), n.month(), n.day(), false) + MINUTES_AFTER_SUNRISE;
   
   if (printMessages) {  
     Serial.print("Time of day: ");
