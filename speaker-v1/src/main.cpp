@@ -43,6 +43,8 @@ Audio test.
 
 
 // Digital I/O used
+/*
+// V0.1 
 #define SD_CS          5
 #define SPI_MOSI      23
 #define SPI_MISO      19
@@ -52,6 +54,20 @@ Audio test.
 #define I2S_BCLK      14
 #define I2S_LRC       25
 #define BUZZER_PIN 16
+*/
+
+//V0.2
+#define SD_CS          5
+#define SPI_MOSI      23
+#define SPI_MISO      19
+#define SPI_SCK       18
+#define SD_ENABLE     17
+#define I2S_DOUT      33
+#define I2S_BCLK      25
+#define I2S_LRC       26
+#define BUZZER_PIN    4
+#define STATUS_LED    16
+#define EN_5V         2
 
 #define START_MINUTE 0
 #define START_HOUR 12
@@ -60,6 +76,10 @@ Audio test.
 #define LOG_AUDIO LOG_DIR + "/audio.log"
 #define AUDIO_DIR String("/audio")
 #define DEVICE_ID_FILE "/cameraDeviceID"
+
+#define PWM1_Ch 0
+#define PWM1_Freq 2700
+#define PWM1_Res 8
 
 bool triggered = false;
 
@@ -124,16 +144,19 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
       uint8_t cManufacturerData[100];
       strManufacturerData.copy((char *)cManufacturerData, strManufacturerData.length(), 0);
       if (strManufacturerData.length() >= 10 && strManufacturerData[0] == 0x12 && strManufacturerData[1] == 0x12) {
-        for (int i = 0; i < strManufacturerData.length(); i++) {
-          //Serial.printf("[%X]", cManufacturerData[i]);
-        }
+        //for (int i = 0; i < strManufacturerData.length(); i++) {
+        //  Serial.printf("[%X]", cManufacturerData[i]);
+        //}
         if (strManufacturerData[5] == BEACON_CLASSIFICATION_TYPE) {
           ClassificationBeacon cBeacon = ClassificationBeacon(strManufacturerData);
+          Serial.print("Device ID: ");
           Serial.println(cBeacon.deviceID);
-          Serial.println(cBeacon.animal[0]);
           int animal = cBeacon.animal[0];
-          Serial.println(cBeacon.confidences[0]);
+          Serial.println("Animal: ");
+          Serial.println(animal);
           int con = cBeacon.confidences[0];
+          Serial.print("Confidence: ");
+          Serial.println(con);
           if (animal == 1 || animal == 7) {
             if (con > 80) {
               Serial.println("Trigger!!");
@@ -160,6 +183,8 @@ int countFilesInDir(String dirStr) {
 }
 
 void initAudio() {
+  pinMode(EN_5V, OUTPUT);
+  digitalWrite(EN_5V, HIGH);
   Serial.println("Init Audio");
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
 }
@@ -274,16 +299,22 @@ void initSDCard() {
     Serial.println("Initialization of SD failed!");
     hibernate(5L);
   }
-  Serial.println("Checking LOG_DIR exists.");
-  if (!SD.exists(LOG_DIR)) {
-    Serial.println("Making LOG_DIR");
-    SD.mkdir(LOG_DIR);
+
+  String audioDirs[9] = {};
+  audioDirs[0] = LOG_DIR;
+  audioDirs[1] = AUDIO_DIR;
+  for (int i = 0; i<7; i++) {
+    audioDirs[i+2] = AUDIO_DIR + String("/") + daysOfTheWeek[i];
   }
-  Serial.println("Checking AUDIO_DIR exists.");
-  if (!SD.exists(AUDIO_DIR)) {
-    Serial.println("Making AUDIO_DIR");
-    SD.mkdir(AUDIO_DIR);
+  
+  for (int i = 0; i<9; i++) {
+    String dir = audioDirs[i];
+    if (!SD.exists(dir)) {
+      Serial.println("Making folder: "+dir);
+      SD.mkdir(dir);
+    }
   }
+
   Serial.println("Checking audio logs file exist");
   if (!SD.exists(LOG_AUDIO)) {
     File f = SD.open(LOG_AUDIO, FILE_APPEND);
@@ -316,6 +347,14 @@ void beaconScan(int scanTime) {
 
 esp_sleep_wakeup_cause_t wakeupReason;
 
+void buzzerOn() {
+  ledcWrite(PWM1_Ch, 125);
+}
+
+void buzzerOff() {
+  ledcWrite(PWM1_Ch, 0);
+}
+
 void setup() {
   wakeupReason = esp_sleep_get_wakeup_cause();
   pinMode(BUZZER_PIN, OUTPUT);
@@ -324,6 +363,8 @@ void setup() {
   Serial.println("\n\n================================================");
   rtc.init();
   initAudio();
+  ledcAttachPin(BUZZER_PIN, PWM1_Ch);
+  ledcSetup(PWM1_Ch, PWM1_Freq, PWM1_Res);
 }
 
 void loop(){
@@ -331,15 +372,17 @@ void loop(){
 
   if (wakeupReason == ESP_SLEEP_WAKEUP_UNDEFINED) {
     Serial.println("Device reset, listen for beacons for testing.");
-    digitalWrite(BUZZER_PIN, HIGH);
+    buzzerOn();
+    //digitalWrite(BUZZER_PIN, HIGH);1
     delay(1000);
-    digitalWrite(BUZZER_PIN, LOW);
-      beaconScan(20); 
-      while (triggered) {
-        playSound(VOL_LOUD);
-        triggered = false;
-        beaconScan(20);
-      }
+    buzzerOff();
+    //digitalWrite(BUZZER_PIN, LOW);
+    beaconScan(1); 
+    while (triggered) {
+      playSound(VOL_LOUD);
+      triggered = false;
+      beaconScan(20);
+    }
     hibernate(1);
   }
 

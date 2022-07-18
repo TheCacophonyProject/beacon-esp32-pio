@@ -60,7 +60,7 @@ int RTC::nightOfTheWeek(){
   if (!n.isPM()) {
     d--;
   }
-  return d%7;
+  return (d+7)%7;
 }
 
 DateTime RTC::now(){
