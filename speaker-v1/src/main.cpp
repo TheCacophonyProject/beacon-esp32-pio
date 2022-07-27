@@ -69,13 +69,10 @@ Audio test.
 #define STATUS_LED    16
 #define EN_5V         2
 
-#define START_MINUTE 0
-#define START_HOUR 12
-
 #define LOG_DIR String("/logs")
 #define LOG_AUDIO LOG_DIR + "/audio.log"
 #define AUDIO_DIR String("/audio")
-#define DEVICE_ID_FILE "/cameraDeviceID"
+#define DEVICE_ID_FILE "/cameraDeviceID.txt"
 
 #define PWM1_Ch 0
 #define PWM1_Freq 2700
@@ -87,8 +84,6 @@ String daysOfTheWeek[7] = {"sunday", "monday", "tuesday", "wednesday", "thursday
 
 Audio audio;
 RTC rtc;
-
-#define ENDIAN_CHANGE_U16(x) ((((x)&0xFF00) >> 8) + (((x)&0xFF) << 8))
 
 #define VOL_LOUD 21    // 0...21
 #define VOL_QUIET 10  // 0...21
@@ -113,30 +108,6 @@ void writeLog(String file, String log) {
   f.close();
 }
 
-void addDeviceID(int newID) {
-  for (int i = 0; i < DEVICE_ID_LEN; i++) {
-    int id = deviceIDs[i];
-    if (id == 0) {
-      Serial.println("Adding beacon device ID: " + String(newID));
-      deviceIDs[i] = newID;
-      return;
-    }
-    if (id == newID) {
-      return;
-    }
-  }
-  Serial.println("No more room to store devices IDs from beacons!");
-}
-
-bool checkForID(int id) {
-  for (int i = 0; i < DEVICE_ID_LEN; i++) {
-    if (id == deviceIDs[i]) {
-      return true;
-    }
-  }
-  return false;
-}
-
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice advertisedDevice) {
     if (advertisedDevice.haveManufacturerData() == true) {
@@ -151,6 +122,11 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
           ClassificationBeacon cBeacon = ClassificationBeacon(strManufacturerData);
           Serial.print("Device ID: ");
           Serial.println(cBeacon.deviceID);
+          Serial.println(deviceID);
+          if (deviceID != 0 && cBeacon.deviceID != deviceID) {
+            Serial.println("Beacon from different device.");
+            return;
+          }
           int animal = cBeacon.animal[0];
           Serial.println("Animal: ");
           Serial.println(animal);
@@ -228,28 +204,11 @@ bool noSoundToPlayTonight() {
   return countFilesInDir(AUDIO_DIR+"/"+daysOfTheWeek[rtc.nightOfTheWeek()]) == 0;
 }
 
-File whatSoundToPlay() {
-  int daysAudioFileIndex = TimeSpan(rtc.now().unixtime()).days()%audioFileCount;
-  if (rtc.now().isPM()) {
-    daysAudioFileIndex = (daysAudioFileIndex+1)%audioFileCount;
-  };
-  Serial.println("Audio file index for today is: "+ String(daysAudioFileIndex));
-  File audioDir = SD.open(AUDIO_DIR);
-  File audioFile = audioDir.openNextFile();
-  for (int i = 0; i < daysAudioFileIndex; i++) {
-    audioFile = audioDir.openNextFile();
-    if (!audioFile) {
-      break;
-    }
-    if (!audioFile.isDirectory()) {
-      audioFileCount++;
-    }
-  }
-  Serial.println("Audio file to play is" + String(audioFile.name()));
-  return audioFile;
-}
-
 void playSound(int volume) {
+  if (noSoundToPlayTonight()) {
+    Serial.println("No sound to play for tonight");
+    return;
+  }
   String file = whatFileToPlay().name();
   writeLog(LOG_AUDIO, "Playing: " + file + ", " + String(volume));
   audio.setVolume(volume);
@@ -360,7 +319,7 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
   Serial.begin(115200);
-  Serial.println("\n\n================================================");
+  Serial.println("\n\n====================");
   rtc.init();
   initAudio();
   ledcAttachPin(BUZZER_PIN, PWM1_Ch);
@@ -373,11 +332,9 @@ void loop(){
   if (wakeupReason == ESP_SLEEP_WAKEUP_UNDEFINED) {
     Serial.println("Device reset, listen for beacons for testing.");
     buzzerOn();
-    //digitalWrite(BUZZER_PIN, HIGH);1
     delay(1000);
     buzzerOff();
-    //digitalWrite(BUZZER_PIN, LOW);
-    beaconScan(1); 
+    beaconScan(20); 
     while (triggered) {
       playSound(VOL_LOUD);
       triggered = false;
