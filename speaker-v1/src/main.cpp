@@ -122,13 +122,12 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
           ClassificationBeacon cBeacon = ClassificationBeacon(strManufacturerData);
           Serial.print("Device ID: ");
           Serial.println(cBeacon.deviceID);
-          Serial.println(deviceID);
           if (deviceID != 0 && cBeacon.deviceID != deviceID) {
             Serial.println("Beacon from different device.");
             return;
           }
           int animal = cBeacon.animal[0];
-          Serial.println("Animal: ");
+          Serial.print("Animal: ");
           Serial.println(animal);
           int con = cBeacon.confidences[0];
           Serial.print("Confidence: ");
@@ -189,7 +188,6 @@ File whatFileToPlay(){
   File audioDir = SD.open(dir);
   File audioFile = audioDir.openNextFile();
   int daysAudioFileIndex = getSoundIndex()%filesForTonight;
-  Serial.println(daysAudioFileIndex);
   for (int i = 0; i < daysAudioFileIndex; i++) {
     audioFile = audioDir.openNextFile();
     if (!audioFile) {
