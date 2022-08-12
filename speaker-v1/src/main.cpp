@@ -80,7 +80,7 @@ Audio test.
 
 bool triggered = false;
 
-String daysOfTheWeek[7] = {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"};
+String daysOfTheWeek[7] = {"7_Sunday", "1_Monday", "2_Tuesday", "3_Wednesday", "4_Thursday", "5_Friday", "6_Saturday"};
 
 Audio audio;
 RTC rtc;
@@ -283,6 +283,10 @@ void initSDCard() {
     String deviceIDStr = deviceIDFile.readString();
     deviceID = deviceIDStr.toInt();
     Serial.println("Device ID to listen to: " + String(deviceID));
+  } else {
+    File f = SD.open(DEVICE_ID_FILE, FILE_APPEND);
+    f.println("");
+    f.close();
   }
 }
 

@@ -1,4 +1,6 @@
 # beacon-esp32-pio
+The Cacophony Speaker plays pre-recorded and saved audio files in a routine that is programmed into each device by the user. It is not standalone device and must be used in conjunction with a Cacophony Thermal Camera that is running the AI model.
+
 
 ## Speaker Setup
 - SD card setup
@@ -10,19 +12,18 @@
     SD CARD
     │
     ├── 📂audio
-    │   ├── 📂monday
-    │   ├── 📂tuesday
-    │   ├── 📂wednesday
-    │   ├── 📂thursday
-    │   ├── 📂friday
-    │   ├── 📂saturday
-    │   └── 📂sunday
+    │   ├── 📂1_Monday
+    │   ├── 📂2_Tuesday
+    │   ├── 📂3_Wednesday
+    │   ├── 📂4_Thursday
+    │   ├── 📂5_Friday
+    │   ├── 📂6_Saturday
+    │   └── 📂7_Sunday
     ├── 📂logs
-    │   ├── 📃audio.log
     │   ├── 📃audio.log
     └── 📃cameraDeviceID.txt
     ```
-- If you want only one device to trigger the speaker enter in the devices id (just the number) to `cameraDeviceID.txt`.
+- If you want only one Thermal Camera to trigger the speaker then enter in the Thermal Cameras ID (just the number) to `cameraDeviceID.txt`.
 - Audio files setup
     - Convert the audio files folowing these instructions https://learn.adafruit.com/adafruit-wave-shield-audio-shield-for-arduino/check-your-files
     - For each night of the week put the audio files that you want to play in that folder.
@@ -36,21 +37,21 @@
     SD CARD
     │
     ├── 📂audio
-    │   ├── 📂monday
+    │   ├── 📂1_Monday
     │   │   └── 🎵rat-sound.wav
-    │   ├── 📂tuesday
+    │   ├── 📂2_Tuesday
     │   │   ├── 🎵01-possum.wav
     │   │   └── 🎵02-possum.wav
-    │   ├── 📂wednesday
-    │   ├── 📂thursday
-    │   ├── 📂friday
-    │   ├── 📂saturday
-    │   └── 📂sunday
+    │   ├── 📂3_Wednesday
+    │   ├── 📂4_Thursday
+    │   ├── 📂5_Friday
+    │   ├── 📂6_Saturday
+    │   └── 📂7_Sunday
     ```
 ## Testing speaker
 - To test the speaker you can manually trigger a bluetooth beacon from your phone using the Sidekick App.
 - Setting up Beacon on Sidekick:
-    - Instal Sidekick from the Play Store.
+    - Instal Sidekick from the Play Store, you need version v2.4.1 or newer. For now you need to join the beta channel to get this version.
     - Go to the settings page.
     - Click on the version number, about 10 times, until the developers page opens.
     - Click on "Open BLE" (Bluetooth Low Energy).
